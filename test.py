@@ -19,18 +19,45 @@ def add_student(student):
 def add_students(course_id, students):
     with psycopg2.connect(dbname='test_db', user='test_user') as conn:
         with conn.cursor() as curs:
-            curs.execute(f"""insert into Students VALUES(default, '{students}');
-                        """)
-            curs.execute(f"""insert into Course values(default, {course_id})""")
+            curs.execute("""insert into Students(name) VALUES(%s) returning id;""", (students,))
+            id_from_student = curs.fetchall()[0]
+            curs.execute(f"""insert into Course (name) values(%s) returning id;""", (course_id,))
+            id_from_cource = curs.fetchall()[0]
 
             curs.execute("""create table student_course(
-            id serial PRIMARY KEY,
-            student_id INTEGER REFERENCES Students(id),
-            course_id INTEGER REFERENCES Course(id));
-            """)
+                        id serial PRIMARY KEY,
+                        student_id INTEGER REFERENCES Students(id),
+                        course_id INTEGER REFERENCES Course(id));
+                        """)
 
-            curs.execute("""insert into student_course values(student_id,course_id)""")
-    return 'ok'
-print(add_students(5, 'Petya'))
+            curs.execute("""insert into student_course (student_id, course_id) values(%s, %s) returning id;""", (id_from_student,id_from_cource))
+    return f'Студент создан и запсиан на курс'
 
+# print(add_students(4,'Ruslan'))
 
+def get_student(student_id):
+    with psycopg2.connect(dbname='test_db', user='test_user') as conn:
+        with conn.cursor() as cur:
+            cur.execute("""select * from Students;""")
+            all_students = cur.fetchall()
+            for student in all_students:
+                if student_id == student[0]:
+                    return student
+# print(get_student(2))
+
+def get_students(course_id):
+    with psycopg2.connect(dbname='test_db', user='test_user') as conn:
+        with conn.cursor() as cur:
+            cur.execute("""select * from student_course;""")
+            student_course = cur.fetchall()
+            for course in student_course:
+                if course_id == course[2]:
+                    student_id = course[1]
+                    cur.execute("""select * from Students;""")
+                    all_students = cur.fetchall()
+                    students_of_course = []
+                    for student in all_students:
+                        if student_id == student[0]:
+                            students_of_course.append(student)
+            return students_of_course
+print(get_students(1))
